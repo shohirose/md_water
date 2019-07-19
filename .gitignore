@@ -30,3 +30,6 @@
 *.exe
 *.out
 *.app
+
+build/
+vector3.h
