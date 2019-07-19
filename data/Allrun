@@ -1,0 +1,1 @@
+../build/src/md_water trjout water.psf input.pdb config
