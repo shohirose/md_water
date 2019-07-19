@@ -25,14 +25,14 @@ int main(int argc, char** argv) {
   ifstream fc(argv[4]);
   System system;
   if (!load_config(fc, system)) return 1;
-  vector<Atom> atomVector;
-  if (!load_psf(fs, system, atomVector)) return 1;
+  vector<Atom> atoms;
+  if (!load_psf(fs, system, atoms)) return 1;
 
   const int natom = system.natom;
   const int nwat = natom / 3;
   const int nfree = natom * 3 - nwat * 3;
 
-  if (!load_pdb(fp, atomVector)) return 1;
+  if (!load_pdb(fp, atoms)) return 1;
 
   int print_energy_step = 1;
   int print_trj_step = 1;
@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
 
   cout << "REMARK Number of atoms " << natom << '\n';
   for (int i = 0; i < natom; i++) {
-    Atom& at = atomVector[i];
+    Atom& at = atoms[i];
     at.R = sqrt(2. * kb * T * gamma * at.mass / dt);
   }
 
@@ -85,34 +85,34 @@ int main(int argc, char** argv) {
   cout << "REMARK gmax = " << dum << '\n';
 
   double ew_self = 0;
-  for (int i = 0; i < atomVector.size(); i++) {
-    ew_self += atomVector[i].charge * atomVector[i].charge;
+  for (int i = 0; i < atoms.size(); i++) {
+    ew_self += atoms[i].charge * atoms[i].charge;
   }
   ew_self *= -system.ewcoeff / sqrt(M_PI) * 332.0636;
 
   int icnt = 0;
   for (int i = 0; i < natom; i++) {
-    Atom& at = atomVector[i];
+    Atom& at = atoms[i];
     at.velocity.x = gauss() * sqrt(kb * T / at.mass);
     at.velocity.y = gauss() * sqrt(kb * T / at.mass);
     at.velocity.z = gauss() * sqrt(kb * T / at.mass);
   }
 
-  output(fo, atomVector, system);
+  output(fo, atoms, system);
 
   vector<int> lj_pair_list, el_pair_list, shake_list;
-  make_lj_pair(atomVector, lj_pair_list);
-  make_el_pair(atomVector, el_pair_list);
-  make_shake_pair(atomVector, shake_list);
+  make_lj_pair(atoms, lj_pair_list);
+  make_el_pair(atoms, el_pair_list);
+  make_shake_pair(atoms, shake_list);
 
-  calc_pot(atomVector, lj_pair_list, el_pair_list, system, g);
-  double Ktmp = calc_kin(atomVector);
+  calc_pot(atoms, lj_pair_list, el_pair_list, system, g);
+  double Ktmp = calc_kin(atoms);
   system.es += ew_self;
   print_ene(0, system, Ktmp, nfree);
 
-  calc_frc(atomVector, lj_pair_list, el_pair_list, system, g);
-  for (int i = 0; i < atomVector.size(); i++) {
-    Atom& at = atomVector[i];
+  calc_frc(atoms, lj_pair_list, el_pair_list, system, g);
+  for (int i = 0; i < atoms.size(); i++) {
+    Atom& at = atoms[i];
     at.fold = at.fnew;
     at.rold = at.position;
     at.position = at.rold + dt * at.velocity + dtdt_div2 / at.mass * at.fold;
@@ -121,39 +121,39 @@ int main(int argc, char** argv) {
   double accum = 0;
 
   for (int istep = 1; istep <= nstep; istep++) {
-    calc_frc(atomVector, lj_pair_list, el_pair_list, system, g);
-    for (int i = 0; i < atomVector.size(); i++) {
+    calc_frc(atoms, lj_pair_list, el_pair_list, system, g);
+    for (int i = 0; i < atoms.size(); i++) {
       Vector3 noise(gauss(), gauss(), gauss());
-      Atom& at = atomVector[i];
+      Atom& at = atoms[i];
       at.rnew = 2. * at.position - at.rold + gamma * dt_div2 * at.rold +
                 dt * dt / at.mass * (at.fnew + at.R * noise);
       at.rnew = at.rnew * inB;
     }
 
     for (int ishake = 0; ishake < 100; ishake++) {
-      if (shake(atomVector, shake_list)) break;
+      if (shake(atoms, shake_list)) break;
       if (ishake == 99) {
         cerr << "error: shake does not converged.\n";
         return 1;
       }
     }
 
-    for (int i = 0; i < atomVector.size(); i++) {
-      Atom& at = atomVector[i];
+    for (int i = 0; i < atoms.size(); i++) {
+      Atom& at = atoms[i];
       at.vnew = 0.5 / dt * (at.rnew - at.rold);
     }
 
-    double K = calc_kin(atomVector);
-    calc_pot(atomVector, lj_pair_list, el_pair_list, system, g);
+    double K = calc_kin(atoms);
+    calc_pot(atoms, lj_pair_list, el_pair_list, system, g);
     system.es += ew_self;
     if (istep % print_energy_step == 0) print_ene(istep, system, K, nfree);
 
     if (istep % print_trj_step == 0) {
-      output(fo, atomVector, system);
+      output(fo, atoms, system);
     }
 
-    for (int i = 0; i < atomVector.size(); i++) {
-      Atom& at = atomVector[i];
+    for (int i = 0; i < atoms.size(); i++) {
+      Atom& at = atoms[i];
       at.rold = at.position;
       at.position = at.rnew;
       at.velocity = at.vnew;

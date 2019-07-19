@@ -15,7 +15,7 @@ void print_ene(int istep, System& system, double K, int nfree) {
             << K * 2. / nfree / kb << '\n';
 }
 
-bool shake(std::vector<Atom>& atomVector, std::vector<int>& shake_list) {
+bool shake(std::vector<Atom>& atoms, std::vector<int>& shake_list) {
   static const double eps = 1e-6;
   static const double eps2 = eps * eps;
   static const double rOH = 0.9572;
@@ -24,8 +24,8 @@ bool shake(std::vector<Atom>& atomVector, std::vector<int>& shake_list) {
   static const double rHH = rOH * sin(aHOH / 2.) * 2.;
   static const double dHH = rHH * rHH;
   for (int i = 0; i < shake_list.size() / 2; i++) {
-    Atom& at1 = atomVector[shake_list[2 * i]];
-    Atom& at2 = atomVector[shake_list[2 * i + 1]];
+    Atom& at1 = atoms[shake_list[2 * i]];
+    Atom& at2 = atoms[shake_list[2 * i + 1]];
     double gamma;
     if (at1.atomname == "O" && at2.atomname == "H") {
       gamma = (dOH - norm(at1.rnew - at2.rnew)) /
@@ -41,8 +41,8 @@ bool shake(std::vector<Atom>& atomVector, std::vector<int>& shake_list) {
   }
 
   for (int i = 0; i < shake_list.size() / 2; i++) {
-    Atom& at1 = atomVector[shake_list[2 * i]];
-    Atom& at2 = atomVector[shake_list[2 * i + 1]];
+    Atom& at1 = atoms[shake_list[2 * i]];
+    Atom& at2 = atoms[shake_list[2 * i + 1]];
     double r = vabs(at1.rnew - at2.rnew);
     double error;
     if (at1.atomname == "O" && at2.atomname == "H") {
@@ -56,16 +56,16 @@ bool shake(std::vector<Atom>& atomVector, std::vector<int>& shake_list) {
   return true;
 }
 
-double calc_kin(std::vector<Atom>& atomVector) {
+double calc_kin(std::vector<Atom>& atoms) {
   double k = 0;
-  for (int i = 0; i < atomVector.size(); i++) {
-    Atom& at = atomVector[i];
+  for (int i = 0; i < atoms.size(); i++) {
+    Atom& at = atoms[i];
     k += at.mass * norm(at.vnew);
   }
   return k * 0.5;
 }
 
-void calc_frc(std::vector<Atom>& atomVector, std::vector<int>& lj_pair_list,
+void calc_frc(std::vector<Atom>& atoms, std::vector<int>& lj_pair_list,
               std::vector<int>& el_pair_list, System& system,
               std::vector<Vector3>& g) {
   static double cutoff = system.cutoff;
@@ -80,17 +80,17 @@ void calc_frc(std::vector<Atom>& atomVector, std::vector<int>& lj_pair_list,
   static double A_2 = A * 2.;
   static double B = 595.0;
   static double C = 332.0636;
-  for (int i = 0; i < atomVector.size(); i++) {
-    atomVector[i].fnew.x = 0.;
-    atomVector[i].fnew.y = 0.;
-    atomVector[i].fnew.z = 0.;
+  for (int i = 0; i < atoms.size(); i++) {
+    atoms[i].fnew.x = 0.;
+    atoms[i].fnew.y = 0.;
+    atoms[i].fnew.z = 0.;
   }
 
   for (int i = 0; i < lj_pair_list.size(); i++) {
-    Atom& at1 = atomVector[lj_pair_list[i]];
+    Atom& at1 = atoms[lj_pair_list[i]];
 
     for (int j = i + 1; j < lj_pair_list.size(); j++) {
-      Atom& at2 = atomVector[lj_pair_list[j]];
+      Atom& at2 = atoms[lj_pair_list[j]];
       Vector3 del = at1.position - at2.position;
       del.x -= boxsize * floor(del.x / boxsize + 0.5);
       del.y -= boxsize * floor(del.y / boxsize + 0.5);
@@ -105,15 +105,15 @@ void calc_frc(std::vector<Atom>& atomVector, std::vector<int>& lj_pair_list,
     }
     //	if (!i) print(f12);
   }
-  //	print(atomVector[0].fnew);
+  //	print(atoms[0].fnew);
 
   // ewald intra force
-  for (int i = 0; i < atomVector.size() / 3; i++) {
+  for (int i = 0; i < atoms.size() / 3; i++) {
     Vector3 frc(0., 0., 0.);
     int j = 3 * i;
-    Atom& at1 = atomVector[j];
-    Atom& at2 = atomVector[j + 1];
-    Atom& at3 = atomVector[j + 2];
+    Atom& at1 = atoms[j];
+    Atom& at2 = atoms[j + 1];
+    Atom& at3 = atoms[j + 2];
     Vector3 del1 = at1.position - at2.position;
     del1.x -= boxsize * floor(del1.x / boxsize + 0.5);
     del1.y -= boxsize * floor(del1.y / boxsize + 0.5);
@@ -154,8 +154,8 @@ void calc_frc(std::vector<Atom>& atomVector, std::vector<int>& lj_pair_list,
 
   // ewald direct space force summation
   for (int i = 0; i < el_pair_list.size() / 2; i++) {
-    Atom& at1 = atomVector[el_pair_list[2 * i]];
-    Atom& at2 = atomVector[el_pair_list[2 * i + 1]];
+    Atom& at1 = atoms[el_pair_list[2 * i]];
+    Atom& at2 = atoms[el_pair_list[2 * i + 1]];
 
     Vector3 del = at1.position - at2.position;
     del.x -= boxsize * floor(del.x / boxsize + 0.5);
@@ -173,16 +173,16 @@ void calc_frc(std::vector<Atom>& atomVector, std::vector<int>& lj_pair_list,
   }
 
   // ewald reciprocal space summation
-  for (int ii = 0; ii < atomVector.size(); ii++) {
-    Atom& iat = atomVector[ii];
+  for (int ii = 0; ii < atoms.size(); ii++) {
+    Atom& iat = atoms[ii];
     Vector3 frc(0., 0., 0.);
     for (int i = 0; i < g.size(); i++) {
       double ag = vabs(g[i]);
       double agag = ag * ag;
       double pre, dtmp;
       pre = 0;
-      for (int j = 0; j < atomVector.size(); j++) {
-        Atom& jat = atomVector[j];
+      for (int j = 0; j < atoms.size(); j++) {
+        Atom& jat = atoms[j];
         Vector3 del = iat.position - jat.position;
         del.x -= boxsize * floor(del.x / boxsize + 0.5);
         del.y -= boxsize * floor(del.y / boxsize + 0.5);
@@ -197,10 +197,10 @@ void calc_frc(std::vector<Atom>& atomVector, std::vector<int>& lj_pair_list,
     iat.fnew += frc * const_recipro * C * iat.charge;
     //		cout << vabs(frc) << '\n';
   }
-  //	print(atomVector[0].fnew);
+  //	print(atoms[0].fnew);
 }
 
-void calc_pot(std::vector<Atom>& atomVector, std::vector<int>& lj_pair_list,
+void calc_pot(std::vector<Atom>& atoms, std::vector<int>& lj_pair_list,
               std::vector<int>& el_pair_list, System& system,
               std::vector<Vector3>& g) {
   static double cutoff = system.cutoff;
@@ -223,9 +223,9 @@ void calc_pot(std::vector<Atom>& atomVector, std::vector<int>& lj_pair_list,
   double U = 0;
 
   for (int i = 0; i < lj_pair_list.size(); i++) {
-    Atom& iat = atomVector[lj_pair_list[i]];
+    Atom& iat = atoms[lj_pair_list[i]];
     for (int j = i + 1; j < lj_pair_list.size(); j++) {
-      Atom& jat = atomVector[lj_pair_list[j]];
+      Atom& jat = atoms[lj_pair_list[j]];
       Vector3 del = iat.position - jat.position;
       del.x -= boxsize * floor(del.x / boxsize + 0.5);
       del.y -= boxsize * floor(del.y / boxsize + 0.5);
@@ -238,11 +238,11 @@ void calc_pot(std::vector<Atom>& atomVector, std::vector<int>& lj_pair_list,
   }
 
   // ewald intra energy
-  for (int i = 0; i < atomVector.size() / 3; i++) {
+  for (int i = 0; i < atoms.size() / 3; i++) {
     int j = 3 * i;
-    Atom& at1 = atomVector[j];
-    Atom& at2 = atomVector[j + 1];
-    Atom& at3 = atomVector[j + 2];
+    Atom& at1 = atoms[j];
+    Atom& at2 = atoms[j + 1];
+    Atom& at3 = atoms[j + 2];
     Vector3 del1 = at1.position - at2.position;
     del1.x -= boxsize * floor(del1.x / boxsize + 0.5);
     del1.y -= boxsize * floor(del1.y / boxsize + 0.5);
@@ -265,8 +265,8 @@ void calc_pot(std::vector<Atom>& atomVector, std::vector<int>& lj_pair_list,
 
   // ewald direct space summation
   for (int i = 0; i < el_pair_list.size() / 2; i++) {
-    Atom& at1 = atomVector[el_pair_list[2 * i]];
-    Atom& at2 = atomVector[el_pair_list[2 * i + 1]];
+    Atom& at1 = atoms[el_pair_list[2 * i]];
+    Atom& at2 = atoms[el_pair_list[2 * i + 1]];
 
     Vector3 del = at1.position - at2.position;
     del.x -= boxsize * floor(del.x / boxsize + 0.5);
@@ -284,15 +284,15 @@ void calc_pot(std::vector<Atom>& atomVector, std::vector<int>& lj_pair_list,
     double re, im, dtmp;
     re = 0;
     im = 0;
-    for (int j = 0; j < atomVector.size(); j++) {
-      Vector3 del = atomVector[j].position;
+    for (int j = 0; j < atoms.size(); j++) {
+      Vector3 del = atoms[j].position;
       del.x -= boxsize * floor(del.x / boxsize + 0.5);
       del.y -= boxsize * floor(del.y / boxsize + 0.5);
       del.z -= boxsize * floor(del.z / boxsize + 0.5);
       double dot = g[i] * del;
 
-      re += atomVector[j].charge * cos(dot);
-      im += atomVector[j].charge * sin(dot);
+      re += atoms[j].charge * cos(dot);
+      im += atoms[j].charge * sin(dot);
     }
     g[i].z ? dtmp = 1. : dtmp = 0.5;
     ew_recipro += dtmp * exp(-agag * factor) / agag * (re * re + im * im);
@@ -308,15 +308,15 @@ void calc_pot(std::vector<Atom>& atomVector, std::vector<int>& lj_pair_list,
   system.es *= C;
 }
 
-void output(std::ofstream& fo, std::vector<Atom>& atomVector, System& system) {
+void output(std::ofstream& fo, std::vector<Atom>& atoms, System& system) {
   static const double boxsize = system.boxsize;
-  fo << atomVector.size() << '\n' << '\n';
+  fo << atoms.size() << '\n' << '\n';
   fo << std::setprecision(6) << std::fixed;
-  for (int i = 0; i < atomVector.size() / 3; i++) {
+  for (int i = 0; i < atoms.size() / 3; i++) {
     int j = 3 * i;
-    Atom& at1 = atomVector[j];
-    Atom& at2 = atomVector[j + 1];
-    Atom& at3 = atomVector[j + 2];
+    Atom& at1 = atoms[j];
+    Atom& at2 = atoms[j + 1];
+    Atom& at3 = atoms[j + 2];
     Vector3 p1 = at1.position;
     Vector3 p2 = at2.position;
     Vector3 p3 = at3.position;
@@ -361,20 +361,18 @@ double gauss() {
   return ((((A9 * R2 + A7) * R2 + A5) * R2 + A3) * R2 + A1) * R;
 }
 
-void make_lj_pair(std::vector<Atom>& atomVector,
-                  std::vector<int>& lj_pair_list) {
-  for (int i = 0; i < atomVector.size(); i++) {
-    if (atomVector[i].atomname == "O") lj_pair_list.push_back(i);
+void make_lj_pair(std::vector<Atom>& atoms, std::vector<int>& lj_pair_list) {
+  for (int i = 0; i < atoms.size(); i++) {
+    if (atoms[i].atomname == "O") lj_pair_list.push_back(i);
   }
 }
 
-void make_el_pair(std::vector<Atom>& atomVector,
-                  std::vector<int>& el_pair_list) {
-  for (int i = 0; i < atomVector.size(); i++) {
-    Atom& at1 = atomVector[i];
+void make_el_pair(std::vector<Atom>& atoms, std::vector<int>& el_pair_list) {
+  for (int i = 0; i < atoms.size(); i++) {
+    Atom& at1 = atoms[i];
 
-    for (int j = i + 1; j < atomVector.size(); j++) {
-      Atom& at2 = atomVector[j];
+    for (int j = i + 1; j < atoms.size(); j++) {
+      Atom& at2 = atoms[j];
 
       if (i / 3 == j / 3) continue;
 
@@ -384,9 +382,8 @@ void make_el_pair(std::vector<Atom>& atomVector,
   }
 }
 
-void make_shake_pair(std::vector<Atom>& atomVector,
-                     std::vector<int>& shake_list) {
-  for (int i = 0; i < atomVector.size() / 3; i++) {
+void make_shake_pair(std::vector<Atom>& atoms, std::vector<int>& shake_list) {
+  for (int i = 0; i < atoms.size() / 3; i++) {
     int j = 3 * i;
     shake_list.push_back(j);
     shake_list.push_back(j + 1);
@@ -434,8 +431,7 @@ bool load_config(std::ifstream& fc, System& system) {
   return true;
 }
 
-bool load_psf(std::ifstream& fs, System& system,
-              std::vector<Atom>& atomVector) {
+bool load_psf(std::ifstream& fs, System& system, std::vector<Atom>& atoms) {
   std::string s;
   while (getline(fs, s)) {
     if (s.find("NATOM", 10) != std::string::npos) {
@@ -452,7 +448,7 @@ bool load_psf(std::ifstream& fs, System& system,
         // cout << atname << '\n';
         // cout << s << '\n';
         at.atomname = atname.substr(0, 1);
-        atomVector.push_back(at);
+        atoms.push_back(at);
       }
       return true;
     }
@@ -460,15 +456,15 @@ bool load_psf(std::ifstream& fs, System& system,
   return false;
 }
 
-bool load_pdb(std::ifstream& fp, std::vector<Atom>& atomVector) {
+bool load_pdb(std::ifstream& fp, std::vector<Atom>& atoms) {
   std::string s;
   int icnt = 0;
   while (getline(fp, s)) {
     if (s.find("ATOM", 0) != std::string::npos) {
-      Atom& at = atomVector[icnt++];
+      Atom& at = atoms[icnt++];
       std::istringstream is(s.substr(30, 24));
       is >> at.position.x >> at.position.y >> at.position.z;
     }
   }
-  return atomVector.size() == icnt ? true : false;
+  return atoms.size() == icnt ? true : false;
 }
