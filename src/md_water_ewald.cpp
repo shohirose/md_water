@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
   const double dtdt_div2 = dt * dt * 0.5;
   const double kb = 0.001987191;  // kcal/mol/K
   const double T = system.T;      // K
-  const double A = 1. - gamma * dt * 0.5;
+  // const double A = 1. - gamma * dt * 0.5;
   const double B = 1. + gamma * dt * 0.5;
   const double inB = 1. / B;
 
@@ -64,11 +64,11 @@ int main(int argc, char** argv) {
   cout << "REMARK T[K] " << T << '\n';
   cout << "REMARK Cutoff[ang.] " << system.cutoff << '\n';
 
-  const double rOH = 0.9572;
-  const double aHOH = 104.52 / 180. * acos(-1.0);
+  // const double rOH = 0.9572;
+  // const double aHOH = 104.52 / 180. * acos(-1.0);
 
   // make reciprocal vectors
-  vector<Vector3> g;
+  std::vector<Vector3> g;
   int kmax = system.kmax;
   int sqkmax = kmax - 1;
   sqkmax *= sqkmax;
@@ -85,14 +85,14 @@ int main(int argc, char** argv) {
   cout << "REMARK gmax = " << dum << '\n';
 
   double ew_self = 0;
-  for (int i = 0; i < atoms.size(); i++) {
+  for (size_t i = 0; i < atoms.size(); i++) {
     ew_self += atoms[i].charge * atoms[i].charge;
   }
   ew_self *= -system.ewcoeff / sqrt(M_PI) * 332.0636;
 
-  int icnt = 0;
+  // int icnt = 0;
   for (int i = 0; i < natom; i++) {
-    Atom& at = atoms[i];
+    auto& at = atoms[i];
     at.velocity.x = gauss() * sqrt(kb * T / at.mass);
     at.velocity.y = gauss() * sqrt(kb * T / at.mass);
     at.velocity.z = gauss() * sqrt(kb * T / at.mass);
@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
 
   output(fo, atoms, system);
 
-  vector<int> lj_pair_list, el_pair_list, shake_list;
+  std::vector<int> lj_pair_list, el_pair_list, shake_list;
   make_lj_pair(atoms, lj_pair_list);
   make_el_pair(atoms, el_pair_list);
   make_shake_pair(atoms, shake_list);
@@ -111,20 +111,21 @@ int main(int argc, char** argv) {
   print_ene(0, system, Ktmp, nfree);
 
   calc_frc(atoms, lj_pair_list, el_pair_list, system, g);
-  for (int i = 0; i < atoms.size(); i++) {
+  for (size_t i = 0; i < atoms.size(); i++) {
     Atom& at = atoms[i];
     at.fold = at.fnew;
     at.rold = at.position;
     at.position = at.rold + dt * at.velocity + dtdt_div2 / at.mass * at.fold;
   }
 
-  double accum = 0;
+  // double accum = 0;
 
   for (int istep = 1; istep <= nstep; istep++) {
     calc_frc(atoms, lj_pair_list, el_pair_list, system, g);
-    for (int i = 0; i < atoms.size(); i++) {
+
+    for (size_t i = 0; i < atoms.size(); i++) {
       Vector3 noise(gauss(), gauss(), gauss());
-      Atom& at = atoms[i];
+      auto& at = atoms[i];
       at.rnew = 2. * at.position - at.rold + gamma * dt_div2 * at.rold +
                 dt * dt / at.mass * (at.fnew + at.R * noise);
       at.rnew = at.rnew * inB;
@@ -138,8 +139,8 @@ int main(int argc, char** argv) {
       }
     }
 
-    for (int i = 0; i < atoms.size(); i++) {
-      Atom& at = atoms[i];
+    for (size_t i = 0; i < atoms.size(); i++) {
+      auto& at = atoms[i];
       at.vnew = 0.5 / dt * (at.rnew - at.rold);
     }
 
@@ -152,8 +153,8 @@ int main(int argc, char** argv) {
       output(fo, atoms, system);
     }
 
-    for (int i = 0; i < atoms.size(); i++) {
-      Atom& at = atoms[i];
+    for (size_t i = 0; i < atoms.size(); i++) {
+      auto& at = atoms[i];
       at.rold = at.position;
       at.position = at.rnew;
       at.velocity = at.vnew;
